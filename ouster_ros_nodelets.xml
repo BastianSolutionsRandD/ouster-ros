@@ -24,4 +24,9 @@
       A nodelet that combines the capabilities of OusterSensor, OusterCloud and OusterImage into a single nodelet.
     </description>
   </class>
+  <class name="ouster_ros/OusterDownsample" type="ouster_ros::OusterDownsample" base_class_type="nodelet::Nodelet">
+    <description>
+      A nodelet that downsamples Ouster point clouds to represent data produced by a lidar with less channels.
+    </description>
+  </class>
 </library>

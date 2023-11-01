@@ -1,0 +1,62 @@
+<launch>
+
+  <!-- Args to pass through -->
+  <arg name="ouster_ns" default="ouster" doc="Override the default namespace of all ouster nodes"/>
+  <arg name="sensor_hostname" default="" doc="hostname or IP in dotted decimal form of the sensor"/>
+  <arg name="udp_dest" default="" doc="hostname or IP where the sensor will send data packets"/>
+  <arg name="lidar_port" default="0" doc="port to which the sensor should send lidar data"/>
+  <arg name="imu_port" default="0" doc="port to which the sensor should send imu data"/>
+  <arg name="udp_profile_lidar" default="" doc="lidar packet profile; possible values: {
+    LEGACY,
+    RNG19_RFL8_SIG16_NIR16_DUAL,
+    RNG19_RFL8_SIG16_NIR16,
+    RNG15_RFL8_NIR8
+    }"/>
+  <arg name="lidar_mode" default="" doc="resolution and rate; possible vaules: {
+    512x10,
+    512x20,
+    1024x10,
+    1024x20,
+    2048x10
+    }"/>
+  <arg name="timestamp_mode" default="" doc="method used to timestamp measurements; possible values: {
+    TIME_FROM_INTERNAL_OSC,
+    TIME_FROM_SYNC_PULSE_IN,
+    TIME_FROM_PTP_1588,
+    TIME_FROM_ROS_TIME
+    }"/>
+  <arg name="metadata" default="" doc="path to write metadata file when receiving sensor data"/>
+  <arg name="viz" default="true" doc="whether to run a rviz"/>
+  <arg name="rviz_config" default="$(find ouster_ros)/config/viz.rviz" doc="optional rviz config file"/>
+  <arg name="tf_prefix" default="" doc="namespace for tf transforms"/>
+
+  <!-- Downsample args -->
+  <arg name="num_channels" default="32" doc="Number of output channels after downsampling"/>
+  <arg name="beam_configuration" default="uniform" doc="Beam configuration to use when downsampling"/>
+
+  <include file="$(find ouster_ros)/launch/sensor.launch">
+    <arg name="ouster_ns" value="$(arg ouster_ns)"/>
+    <arg name="sensor_hostname" value="$(arg sensor_hostname)"/>
+    <arg name="udp_dest" value="$(arg udp_dest)"/>
+    <arg name="lidar_port" value="$(arg lidar_port)"/>
+    <arg name="imu_port" value="$(arg imu_port)"/>
+    <arg name="udp_profile_lidar" value="$(arg udp_profile_lidar)"/>
+    <arg name="lidar_mode" value="$(arg lidar_mode)"/>
+    <arg name="timestamp_mode" value="$(arg timestamp_mode)"/>
+    <arg name="metadata" value="$(arg metadata)"/>
+    <arg name="viz" value="$(arg viz)"/>
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
+    <arg name="tf_prefix" value="$(arg tf_prefix)"/>
+  </include>
+
+  <group ns="$(arg ouster_ns)">
+    <node pkg="nodelet" type="nodelet" name="downsample_node"
+      output="screen" required="true"
+      launch-prefix="bash -c 'sleep 6; $0 $@' "
+      args="load ouster_ros/OusterDownsample os_nodelet_mgr">
+      <param name="~/num_channels" type="int" value="$(arg num_channels)"/>
+      <param name="~/beam_configuration" type="str" value="$(arg beam_configuration)"/>
+    </node>
+  </group>
+
+</launch>

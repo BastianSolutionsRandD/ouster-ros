@@ -83,7 +83,8 @@ add_library(${PROJECT_NAME}_nodelets
   src/os_replay_nodelet.cpp
   src/os_cloud_nodelet.cpp
   src/os_image_nodelet.cpp
-  src/os_driver_nodelet.cpp)
+  src/os_driver_nodelet.cpp
+  src/os_downsample_nodelet.cpp)
 target_link_libraries(${PROJECT_NAME}_nodelets ouster_ros ${catkin_LIBRARIES})
 add_dependencies(${PROJECT_NAME}_nodelets ${PROJECT_NAME}_gencpp)
 
