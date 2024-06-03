@@ -24,6 +24,7 @@
 #include "point_cloud_processor.h"
 #include "laser_scan_processor.h"
 #include "image_processor.h"
+#include "point_cloud_processor_factory.h"
 
 namespace sensor = ouster::sensor;
 
@@ -32,10 +33,12 @@ namespace ouster_ros {
 class OusterDriver : public OusterSensor {
    public:
     OusterDriver() : tf_bcast(getName()) {}
+    ~OusterDriver() override {
+        NODELET_DEBUG("OusterDriver::~OusterDriver() called");
+        halt();
+    }
 
    private:
-    // virtual void onInit() override {
-    // }
 
     virtual void on_metadata_updated(const sensor::sensor_info& info) override {
         OusterSensor::on_metadata_updated(info);
@@ -50,14 +53,14 @@ class OusterDriver : public OusterSensor {
         auto& pnh = getPrivateNodeHandle();
         auto proc_mask =
             pnh.param("proc_mask", std::string{"IMU|IMG|PCL|SCAN"});
-        auto tokens = parse_tokens(proc_mask, '|');
+        auto tokens = impl::parse_tokens(proc_mask, '|');
 
         auto timestamp_mode = pnh.param("timestamp_mode", std::string{});
         double ptp_utc_tai_offset = pnh.param("ptp_utc_tai_offset", -37.0);
 
         auto& nh = getNodeHandle();
 
-        if (check_token(tokens, "IMU")) {
+        if (impl::check_token(tokens, "IMU")) {
             imu_pub = nh.advertise<sensor_msgs::Imu>("imu", 100);
             imu_packet_handler = ImuPacketHandler::create_handler(
                 info, tf_bcast.imu_frame_id(), timestamp_mode,
@@ -67,24 +70,34 @@ class OusterDriver : public OusterSensor {
         int num_returns = get_n_returns(info);
 
         std::vector<LidarScanProcessor> processors;
-        if (check_token(tokens, "PCL")) {
+        if (impl::check_token(tokens, "PCL")) {
             lidar_pubs.resize(num_returns);
             for (int i = 0; i < num_returns; ++i) {
                 lidar_pubs[i] = nh.advertise<sensor_msgs::PointCloud2>(
                     topic_for_return("points", i), 10);
             }
 
-            processors.push_back(PointCloudProcessor::create(
-                info, tf_bcast.point_cloud_frame_id(),
-                tf_bcast.apply_lidar_to_sensor_transform(),
-                [this](PointCloudProcessor::OutputType msgs) {
-                    for (size_t i = 0; i < msgs.size(); ++i) {
-                        lidar_pubs[i].publish(*msgs[i]);
+            auto point_type = pnh.param("point_type", std::string{"original"});
+            processors.push_back(
+                PointCloudProcessorFactory::create_point_cloud_processor(point_type, info,
+                    tf_bcast.point_cloud_frame_id(), tf_bcast.apply_lidar_to_sensor_transform(),
+                    [this](PointCloudProcessor_OutputType msgs) {
+                        for (size_t i = 0; i < msgs.size(); ++i) lidar_pubs[i].publish(*msgs[i]);
                     }
-                }));
+                )
+            );
+
+            // warn about profile incompatibility
+            if (PointCloudProcessorFactory::point_type_requires_intensity(point_type) &&
+                !PointCloudProcessorFactory::profile_has_intensity(info.format.udp_profile_lidar)) {
+                NODELET_WARN_STREAM(
+                    "selected point type '" << point_type
+                    << "' is not compatible with the udp profile: "
+                    << to_string(info.format.udp_profile_lidar));
+            }
         }
 
-        if (check_token(tokens, "SCAN")) {
+        if (impl::check_token(tokens, "SCAN")) {
             scan_pubs.resize(num_returns);
             for (int i = 0; i < num_returns; ++i) {
                 scan_pubs[i] = nh.advertise<sensor_msgs::LaserScan>(
@@ -111,7 +124,7 @@ class OusterDriver : public OusterSensor {
                 }));
         }
 
-        if (check_token(tokens, "IMG")) {
+        if (impl::check_token(tokens, "IMG")) {
             const std::map<sensor::ChanField, std::string>
                 channel_field_topic_map_1{
                     {sensor::ChanField::RANGE, "range_image"},
@@ -145,8 +158,8 @@ class OusterDriver : public OusterSensor {
                 }));
         }
 
-        if (check_token(tokens, "PCL") || check_token(tokens, "SCAN") ||
-            check_token(tokens, "IMG"))
+        if (impl::check_token(tokens, "PCL") || impl::check_token(tokens, "SCAN") ||
+            impl::check_token(tokens, "IMG"))
             lidar_packet_handler = LidarPacketHandler::create_handler(
                 info, processors, timestamp_mode,
                 static_cast<int64_t>(ptp_utc_tai_offset * 1e+9));

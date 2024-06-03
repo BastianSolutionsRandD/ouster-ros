@@ -26,6 +26,7 @@ find_package(
              nodelet)
 
 # ==== Options ====
+add_compile_options(-std=c++17)
 add_compile_options(-Wall -Wextra)
 option(CMAKE_POSITION_INDEPENDENT_CODE "Build position independent code." ON)
 
@@ -90,8 +91,17 @@ add_dependencies(${PROJECT_NAME}_nodelets ${PROJECT_NAME}_gencpp)
 
 # ==== Test ====
 if(CATKIN_ENABLE_TESTING)
-  catkin_add_gtest(${PROJECT_NAME}_test tests/ring_buffer_test.cpp)
-  target_link_libraries(${PROJECT_NAME}_test ${catkin_LIBRARIES})
+  catkin_add_gtest(${PROJECT_NAME}_test
+    src/os_ros.cpp
+    tests/test_main.cpp
+    tests/ring_buffer_test.cpp
+    tests/lock_free_ring_buffer_test.cpp
+    tests/point_accessor_test.cpp
+    tests/point_transform_test.cpp
+    tests/point_cloud_compose_test.cpp
+  )
+  target_link_libraries(${PROJECT_NAME}_test ${catkin_LIBRARIES}
+    ouster_build pcl_common -Wl,--whole-archive ouster_client -Wl,--no-whole-archive)
 endif()
 
 # ==== Install ====
@@ -105,10 +115,19 @@ install(
 )
 
 install(
-  DIRECTORY ${_ouster_ros_INCLUDE_DIRS}
+  DIRECTORY include/ouster_ros/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 )
 
+install(
+  DIRECTORY ouster-sdk/ouster_client/include/ouster/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}/../ouster
+)
+
+install(
+  DIRECTORY ouster-sdk/ouster_client/include/optional-lite/nonstd/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}/../ouster/nonstd/
+)
 install(
   FILES
     LICENSE
